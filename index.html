@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VITALS MONITOR</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #000;
+      color: #ff6600;
+      font-family: 'Courier New', Courier, monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0;
+    }
+
+    /* ── Header bar ─────────────────────────────────── */
+    #header {
+      width: 100%;
+      background: #ff6600;
+      color: #000;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 14px;
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 0.08em;
+      flex-shrink: 0;
+    }
+    #header .left  { display: flex; align-items: center; gap: 18px; }
+    #header .tag   { background: #000; color: #ff6600; padding: 1px 6px; font-size: 11px; }
+    #header .right { font-size: 11px; letter-spacing: 0.12em; opacity: 0.85; }
+
+    /* ── Main panel ─────────────────────────────────── */
+    #panel {
+      width: 100%;
+      max-width: 1020px;
+      border: 1px solid #ff6600;
+      border-top: none;
+      margin-top: 0;
+      flex: 1;
+    }
+
+    /* ── Sub-header ─────────────────────────────────── */
+    #subheader {
+      border-bottom: 1px solid #331a00;
+      padding: 4px 14px;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: #cc5200;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* ── Chart container ─────────────────────────────── */
+    #chart-container {
+      padding: 12px 0 0;
+    }
+
+    svg { display: block; width: 100%; }
+
+    /* ── Axes ────────────────────────────────────────── */
+    .axis text {
+      fill: #804000;
+      font-size: 10px;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    .axis path, .axis line { stroke: #331a00; }
+    .axis .tick line       { stroke: #331a00; }
+
+    .y-axis-label {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 10px;
+    }
+
+    /* ── Grid ────────────────────────────────────────── */
+    .grid-line {
+      stroke: rgba(255,102,0,0.10);
+      stroke-dasharray: none;
+    }
+    .grid-line-minor {
+      stroke: rgba(255,102,0,0.04);
+    }
+
+    /* ── Chart border rect ───────────────────────────── */
+    .chart-border {
+      fill: none;
+      stroke: #331a00;
+      stroke-width: 1;
+    }
+
+    /* ── Data lines ──────────────────────────────────── */
+    .vital-line {
+      fill: none;
+      stroke-width: 1.5;
+      cursor: pointer;
+    }
+
+    .hit-area {
+      fill: none;
+      stroke: transparent;
+      stroke-width: 24;
+      cursor: pointer;
+    }
+
+    /* ── Crosshair ───────────────────────────────────── */
+    .crosshair {
+      stroke: #ff6600;
+      stroke-width: 1;
+      stroke-dasharray: 2 3;
+      pointer-events: none;
+      opacity: 0;
+    }
+    .crosshair-h {
+      stroke: #ff6600;
+      stroke-width: 1;
+      stroke-dasharray: 2 3;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    .hover-dot {
+      pointer-events: none;
+      opacity: 0;
+      stroke: #000;
+      stroke-width: 1.5;
+    }
+
+    /* ── Tooltip ─────────────────────────────────────── */
+    .tooltip {
+      position: fixed;
+      background: #000;
+      border: 1px solid #ff6600;
+      padding: 7px 11px;
+      font-size: 11px;
+      font-family: 'Courier New', Courier, monospace;
+      line-height: 1.7;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.1s;
+      white-space: nowrap;
+      z-index: 10;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Status bar ──────────────────────────────────── */
+    #statusbar {
+      border-top: 1px solid #331a00;
+      padding: 4px 14px;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: #804000;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #statusbar .keys span {
+      border: 1px solid #331a00;
+      padding: 0px 4px;
+      margin-left: 4px;
+      color: #804000;
+      font-size: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="header">
+    <div class="left">
+      <span class="tag">BIO</span>
+      VITALS MONITOR
+    </div>
+    <div class="right" id="clock">--</div>
+  </div>
+
+  <div id="panel">
+    <div id="subheader">
+      <span>BIOMETRIC TIME SERIES &nbsp;·&nbsp; NORMALIZED SCALE &nbsp;·&nbsp; WEEKLY</span>
+      <span id="range-label">--</span>
+    </div>
+    <div id="chart-container"></div>
+    <div id="statusbar">
+      <span id="status-left">READY</span>
+      <span class="keys">
+        CLICK LINE TO INSPECT
+        <span>SELECT</span>
+        CLICK AGAIN TO RESET
+        <span>ESC</span>
+      </span>
+    </div>
+  </div>
+
+  <div class="tooltip" id="tooltip"></div>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+  // ================================================================
+  //  DATA — edit these values freely
+  //  Format: { day: 'YYYY-MM-DD', value: number }
+  // ================================================================
+
+  const VITALS = [
+    {
+      id: 'breathing',
+      label: 'BREATHING RATE',
+      unit: 'BR/MIN',
+      color: '#00AAFF',
+      data: [
+        { day: '2025-01-01', value: 14.0 },
+        { day: '2025-01-08', value: 14.7 },
+        { day: '2025-01-15', value: 13.4 },
+        { day: '2025-01-22', value: 15.2 },
+        { day: '2025-01-29', value: 14.1 },
+        { day: '2025-02-05', value: 14.8 },
+        { day: '2025-02-12', value: 16.0 },
+        { day: '2025-02-19', value: 16.4 },
+        { day: '2025-02-26', value: 16.5 },
+        { day: '2025-03-05', value: 17.9 },
+        { day: '2025-03-12', value: 17.8 },
+        { day: '2025-03-19', value: 18.2 },
+        { day: '2025-03-26', value: 17.1 },
+        { day: '2025-04-02', value: 19.4 },
+      ]
+    },
+    {
+      id: 'heartRate',
+      label: 'HEART RATE',
+      unit: 'BPM',
+      color: '#FF3030',
+      data: [
+        { day: '2025-01-01', value: 81 },
+        { day: '2025-01-08', value: 78 },
+        { day: '2025-01-15', value: 80 },
+        { day: '2025-01-22', value: 79 },
+        { day: '2025-01-29', value: 82 },
+        { day: '2025-02-05', value: 83 },
+        { day: '2025-02-12', value: 82 },
+        { day: '2025-02-19', value: 84 },
+        { day: '2025-02-26', value: 85 },
+        { day: '2025-03-05', value: 84 },
+        { day: '2025-03-12', value: 87 },
+        { day: '2025-03-19', value: 86 },
+        { day: '2025-03-26', value: 88 },
+        { day: '2025-04-02', value: 87 },
+      ]
+    },
+    {
+      id: 'weight',
+      label: 'WEIGHT',
+      unit: 'LBS',
+      color: '#FFD700',
+      data: [
+        { day: '2025-01-01', value: 175.0 },
+        { day: '2025-01-08', value: 175.0 },
+        { day: '2025-01-15', value: 174.0 },
+        { day: '2025-01-22', value: 174.0 },
+        { day: '2025-01-29', value: 172.5 },
+        { day: '2025-02-05', value: 172.5 },
+        { day: '2025-02-12', value: 172.5 },
+        { day: '2025-02-19', value: 170.0 },
+        { day: '2025-02-26', value: 169.0 },
+        { day: '2025-03-05', value: 169.0 },
+        { day: '2025-03-12', value: 168.0 },
+        { day: '2025-03-19', value: 168.0 },
+        { day: '2025-03-26', value: 167.0 },
+        { day: '2025-04-02', value: 166.0 },
+      ]
+    }
+  ];
+
+  // ================================================================
+  //  CHART
+  // ================================================================
+
+  const parseDay = d3.timeParse('%Y-%m-%d');
+  const fmtDate  = d3.timeFormat('%d %b');
+  const fmtFull  = d3.timeFormat('%Y-%m-%d');
+
+  // Live clock
+  function updateClock() {
+    const now = new Date();
+    const s = now.toISOString().replace('T', ' ').slice(0, 19);
+    document.getElementById('clock').textContent = s;
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // Fraction of chart height the data range occupies (lower = flatter, less dramatic)
+  const NORM_FILL = 0.35;
+
+  // Parse dates and compute per-series normalization
+  VITALS.forEach(v => {
+    v.data.forEach(d => { d.date = parseDay(d.day); });
+    const vals = v.data.map(d => d.value);
+    v.min = Math.min(...vals);
+    v.max = Math.max(...vals);
+    v.center = (v.min + v.max) / 2;
+    v.data.forEach(d => {
+      d.norm = v.max === v.min
+        ? 0.5
+        : 0.5 + (d.value - v.center) / (v.max - v.min) * NORM_FILL;
+    });
+  });
+
+  // Date range label
+  const allDates = VITALS.flatMap(v => v.data.map(d => d.date));
+  const xExtent  = d3.extent(allDates);
+  document.getElementById('range-label').textContent =
+    `${fmtFull(xExtent[0])} / ${fmtFull(xExtent[1])}`;
+
+  // Dimensions
+  const margin = { top: 16, right: 180, bottom: 48, left: 62 };
+  const container = document.getElementById('chart-container');
+  const totalWidth  = container.clientWidth || 960;
+  const totalHeight = 440;
+  const W = totalWidth  - margin.left - margin.right;
+  const H = totalHeight - margin.top  - margin.bottom;
+
+  const svg = d3.select('#chart-container')
+    .append('svg')
+    .attr('viewBox', `0 0 ${totalWidth} ${totalHeight}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet');
+
+  const g = svg.append('g')
+    .attr('transform', `translate(${margin.left},${margin.top})`);
+
+  // Scales
+  const x = d3.scaleTime().domain(xExtent).range([0, W]);
+
+  const Y_PAD = 0.08;
+  const y = d3.scaleLinear().domain([-Y_PAD, 1 + Y_PAD]).range([H, 0]);
+
+  // ── Grid ─────────────────────────────────────────────────────────
+  const Y_TICKS = [0, 0.25, 0.5, 0.75, 1.0];
+  const gridG = g.append('g');
+
+  Y_TICKS.forEach(t => {
+    gridG.append('line')
+      .attr('class', 'grid-line')
+      .attr('x1', 0).attr('x2', W)
+      .attr('y1', y(t)).attr('y2', y(t));
+  });
+  // minor grid at 12.5% intervals
+  [0.125, 0.375, 0.625, 0.875].forEach(t => {
+    gridG.append('line')
+      .attr('class', 'grid-line-minor')
+      .attr('x1', 0).attr('x2', W)
+      .attr('y1', y(t)).attr('y2', y(t));
+  });
+
+  // ── X axis ───────────────────────────────────────────────────────
+  g.append('g')
+    .attr('class', 'axis x-axis')
+    .attr('transform', `translate(0,${H})`)
+    .call(
+      d3.axisBottom(x)
+        .ticks(d3.timeWeek.every(1))
+        .tickFormat(d => fmtDate(d).toUpperCase())
+        .tickSize(4)
+    )
+    .selectAll('text')
+      .style('text-anchor', 'end')
+      .attr('dx', '-0.5em')
+      .attr('dy', '0.15em')
+      .attr('transform', 'rotate(-38)');
+
+  // ── Y axis ───────────────────────────────────────────────────────
+  const yAxisG = g.append('g').attr('class', 'y-axis');
+
+  function drawYAxisBase() {
+    yAxisG.selectAll('*').remove();
+
+    yAxisG.append('line')
+      .attr('x1', 0).attr('x2', 0)
+      .attr('y1', y(0)).attr('y2', y(1))
+      .attr('stroke', '#331a00');
+
+    Y_TICKS.forEach(t => {
+      yAxisG.append('line')
+        .attr('x1', -5).attr('x2', 0)
+        .attr('y1', y(t)).attr('y2', y(t))
+        .attr('stroke', '#331a00');
+    });
+  }
+
+  function drawYAxisLabels(vital) {
+    yAxisG.selectAll('.y-label, .y-unit').remove();
+    if (!vital) return;
+
+    Y_TICKS.forEach(t => {
+      const actual = vital.center + (t - 0.5) * (vital.max - vital.min) / NORM_FILL;
+      const text   = Number.isInteger(actual)
+        ? String(actual).padStart(5, '\u00a0')
+        : actual.toFixed(1).padStart(6, '\u00a0');
+
+      yAxisG.append('text')
+        .attr('class', 'y-label y-axis-label')
+        .attr('x', -8)
+        .attr('y', y(t))
+        .attr('dy', '0.35em')
+        .attr('text-anchor', 'end')
+        .style('fill', vital.color)
+        .style('opacity', 0)
+        .text(text)
+        .transition().duration(160)
+        .style('opacity', 1);
+    });
+
+    yAxisG.append('text')
+      .attr('class', 'y-unit y-axis-label')
+      .attr('transform', 'rotate(-90)')
+      .attr('x', -(H / 2))
+      .attr('y', -48)
+      .attr('text-anchor', 'middle')
+      .style('fill', vital.color)
+      .style('font-size', '9px')
+      .style('letter-spacing', '0.15em')
+      .style('opacity', 0)
+      .text(vital.unit)
+      .transition().duration(160)
+      .style('opacity', 0.6);
+  }
+
+  drawYAxisBase();
+
+  // ── Chart border ─────────────────────────────────────────────────
+  g.append('rect')
+    .attr('class', 'chart-border')
+    .attr('x', 0).attr('y', y(1 + Y_PAD))
+    .attr('width', W)
+    .attr('height', y(-Y_PAD) - y(1 + Y_PAD));
+
+  // ── Line generator ────────────────────────────────────────────────
+  const lineGen = d3.line()
+    .x(d => x(d.date))
+    .y(d => y(d.norm))
+    .curve(d3.curveMonotoneX);
+
+  // ── Crosshairs ────────────────────────────────────────────────────
+  const crosshairV = g.append('line')
+    .attr('class', 'crosshair')
+    .attr('y1', 0).attr('y2', H);
+
+  const crosshairH = g.append('line')
+    .attr('class', 'crosshair-h')
+    .attr('x1', 0).attr('x2', W);
+
+  // ── Visible lines ─────────────────────────────────────────────────
+  const lineGroups = {};
+
+  VITALS.forEach(vital => {
+    const grp = g.append('g').attr('class', `vg-${vital.id}`);
+    lineGroups[vital.id] = grp;
+
+    grp.append('path')
+      .attr('class', 'vital-line')
+      .attr('d', lineGen(vital.data))
+      .attr('stroke', vital.color)
+      .attr('stroke-opacity', 0.8);
+  });
+
+  // ── Hover dot ─────────────────────────────────────────────────────
+  const hoverDot = g.append('circle')
+    .attr('class', 'hover-dot')
+    .attr('r', 3.5);
+
+  // ── Hit areas ─────────────────────────────────────────────────────
+  VITALS.forEach(vital => {
+    g.append('path')
+      .attr('class', 'hit-area')
+      .attr('d', lineGen(vital.data))
+      .on('click',      e => onLineClick(e, vital))
+      .on('mousemove',  e => onLineHover(e, vital))
+      .on('mouseleave', ()  => onMouseLeave());
+  });
+
+  // ── Legend ────────────────────────────────────────────────────────
+  const legendG = svg.append('g')
+    .attr('transform', `translate(${margin.left + W + 18}, ${margin.top + 4})`);
+
+  // Legend border
+  legendG.append('rect')
+    .attr('x', -6).attr('y', -6)
+    .attr('width', 158).attr('height', VITALS.length * 34 + 8)
+    .attr('fill', '#000')
+    .attr('stroke', '#331a00')
+    .attr('stroke-width', 1);
+
+  VITALS.forEach((vital, i) => {
+    const row = legendG.append('g')
+      .attr('class', `leg-${vital.id}`)
+      .attr('transform', `translate(0, ${i * 34})`);
+
+    // Visibility toggle indicator (click to hide/show)
+    row.append('rect')
+      .attr('class', 'leg-toggle')
+      .attr('x', 0).attr('y', 2)
+      .attr('width', 8).attr('height', 8)
+      .attr('fill', vital.color)
+      .attr('stroke', vital.color)
+      .attr('stroke-width', 1)
+      .style('cursor', 'pointer')
+      .on('click', e => { e.stopPropagation(); toggleHidden(vital.id); });
+
+    // Swatch line (click to inspect)
+    row.append('line')
+      .attr('class', 'leg-swatch')
+      .attr('x1', 14).attr('x2', 32)
+      .attr('y1', 8).attr('y2', 8)
+      .attr('stroke', vital.color)
+      .attr('stroke-width', 1.5)
+      .style('cursor', 'pointer')
+      .on('click', e => { e.stopPropagation(); onLineClick(e, vital); });
+
+    // Label (click to inspect)
+    row.append('text')
+      .attr('class', 'leg-label')
+      .attr('x', 38)
+      .attr('y', 8)
+      .attr('dy', '0.35em')
+      .attr('fill', vital.color)
+      .style('font-size', '10px')
+      .style('letter-spacing', '0.06em')
+      .style('cursor', 'pointer')
+      .on('click', e => { e.stopPropagation(); onLineClick(e, vital); })
+      .text(vital.label);
+
+    // Last value
+    const lastVal = vital.data[vital.data.length - 1];
+    row.append('text')
+      .attr('class', 'leg-val')
+      .attr('x', 38)
+      .attr('y', 21)
+      .attr('dy', '0.35em')
+      .attr('fill', vital.color)
+      .style('font-size', '9px')
+      .style('opacity', 0.5)
+      .text(`${lastVal.value} ${vital.unit}`);
+  });
+
+  // ── Background click to deselect ──────────────────────────────────
+  svg.insert('rect', ':first-child')
+    .attr('width', totalWidth)
+    .attr('height', totalHeight)
+    .attr('fill', 'transparent')
+    .on('click', () => setSelected(null));
+
+  // ── Tooltip ───────────────────────────────────────────────────────
+  const tooltip = d3.select('#tooltip');
+
+  // ── State ─────────────────────────────────────────────────────────
+  let selectedId = null;
+  const hiddenIds = new Set();
+  const bisect    = d3.bisector(d => d.date).left;
+
+  function updateAppearance() {
+    const vital = selectedId ? VITALS.find(v => v.id === selectedId) : null;
+
+    VITALS.forEach(v => {
+      const isHidden    = hiddenIds.has(v.id);
+      const isSelected  = v.id === selectedId;
+      const noneSelected = selectedId === null;
+
+      const lineColor   = isHidden ? '#000' :
+                          noneSelected || isSelected ? v.color : '#2a1500';
+      const lineOpacity = isHidden ? 0 :
+                          noneSelected ? 0.8 : isSelected ? 1.0 : 0.2;
+      const lineWidth   = isSelected ? 2 : 1.5;
+
+      lineGroups[v.id].select('.vital-line')
+        .transition().duration(180)
+        .attr('stroke', lineColor)
+        .attr('stroke-opacity', lineOpacity)
+        .attr('stroke-width', lineWidth);
+
+      const legColor = noneSelected || isSelected ? v.color : '#2a1500';
+      const legColorHidden = isHidden ? v.color : legColor;
+
+      legendG.select(`.leg-${v.id} .leg-toggle`)
+        .transition().duration(180)
+        .attr('fill', isHidden ? 'none' : v.color)
+        .attr('stroke', v.color);
+
+      legendG.select(`.leg-${v.id} .leg-swatch`)
+        .transition().duration(180)
+        .attr('stroke', isHidden ? '#2a1500' : legColor)
+        .attr('stroke-width', lineWidth);
+
+      legendG.select(`.leg-${v.id} .leg-label`)
+        .transition().duration(180)
+        .attr('fill', legColorHidden);
+
+      legendG.select(`.leg-${v.id} .leg-val`)
+        .transition().duration(180)
+        .attr('fill', legColorHidden);
+    });
+
+    drawYAxisBase();
+    drawYAxisLabels(vital);
+
+    document.getElementById('status-left').textContent =
+      vital ? `SELECTED: ${vital.label}` : 'READY';
+    document.getElementById('status-left').style.color =
+      vital ? vital.color : '#804000';
+  }
+
+  function setSelected(id) {
+    if (id && hiddenIds.has(id)) return;
+    selectedId = id;
+    updateAppearance();
+  }
+
+  function toggleHidden(id) {
+    if (hiddenIds.has(id)) {
+      hiddenIds.delete(id);
+    } else {
+      hiddenIds.add(id);
+      if (selectedId === id) selectedId = null;
+    }
+    updateAppearance();
+  }
+
+  // Keyboard deselect
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') setSelected(null);
+  });
+
+  function onLineClick(event, vital) {
+    if (hiddenIds.has(vital.id)) return;
+    event.stopPropagation();
+    setSelected(selectedId === vital.id ? null : vital.id);
+  }
+
+  function onLineHover(event, vital) {
+    if (hiddenIds.has(vital.id)) return;
+    const displayVital = (selectedId && !hiddenIds.has(selectedId))
+      ? VITALS.find(v => v.id === selectedId)
+      : vital;
+
+    const [mx] = d3.pointer(event, g.node());
+    const dateAtCursor = x.invert(mx);
+    const idx = bisect(displayVital.data, dateAtCursor);
+    const d0  = displayVital.data[idx - 1];
+    const d1  = displayVital.data[idx];
+    if (!d0 && !d1) return;
+    const nearest = !d0 ? d1 : !d1 ? d0
+      : (dateAtCursor - d0.date > d1.date - dateAtCursor ? d1 : d0);
+
+    crosshairV
+      .attr('x1', x(nearest.date)).attr('x2', x(nearest.date))
+      .style('opacity', 1);
+
+    crosshairH
+      .attr('y1', y(nearest.norm)).attr('y2', y(nearest.norm))
+      .style('opacity', 1);
+
+    hoverDot
+      .attr('cx', x(nearest.date))
+      .attr('cy', y(nearest.norm))
+      .attr('fill', displayVital.color)
+      .style('opacity', 1);
+
+    tooltip
+      .style('opacity', 1)
+      .style('border-color', displayVital.color)
+      .style('left', (event.clientX + 16) + 'px')
+      .style('top',  (event.clientY - 40) + 'px')
+      .html(
+        `<span style="color:${displayVital.color}">${displayVital.label}</span><br>` +
+        `<span style="color:#804000">${fmtFull(nearest.date)}</span>` +
+        `&ensp;<span style="color:#ff6600">${nearest.value}&thinsp;${displayVital.unit}</span>`
+      );
+  }
+
+  function onMouseLeave() {
+    crosshairV.style('opacity', 0);
+    crosshairH.style('opacity', 0);
+    hoverDot.style('opacity', 0);
+    tooltip.style('opacity', 0);
+  }
+  </script>
+</body>
+</html>

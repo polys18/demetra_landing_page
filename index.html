@@ -111,7 +111,8 @@
     .iti__tel-input:focus { border-color:var(--teal); box-shadow:0 0 0 3px rgba(78,168,166,.12); }
     .iti__flag-container { height:100%; }
     .iti__selected-flag { border-radius:10px 0 0 10px; background:transparent; padding:0 8px 0 10px; }
-    .iti__country-list { border:1px solid var(--bord); border-radius:12px; box-shadow:0 8px 24px rgba(26,26,46,.1); font-family:'Inter',sans-serif; font-size:13px; max-height:220px; }
+    .iti__country-list { border:1px solid var(--bord); border-radius:12px; box-shadow:0 8px 24px rgba(26,26,46,.1); font-family:'Inter',sans-serif; font-size:13px; max-height:220px; z-index:9999; }
+    .iti__selected-dial-code { font-size:14px; font-family:'Inter',sans-serif; }
 
     @keyframes fi { from{opacity:0} to{opacity:1} }
     @keyframes su { from{opacity:0;transform:translateY(20px) scale(.94)} to{opacity:1;transform:none} }
@@ -272,6 +273,7 @@ var iti = window.intlTelInput(document.getElementById('ph'), {
   geoIpLookup: function(cb){ fetch('https://ipapi.co/json').then(function(r){ return r.json(); }).then(function(d){ cb(d.country_code); }).catch(function(){ cb('us'); }); },
   separateDialCode: true,
   strictMode: true,
+  dropdownContainer: document.body,
 });
 
 // ── SUPABASE CLIENT

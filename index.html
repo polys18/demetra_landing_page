@@ -13,7 +13,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23/build/css/intlTelInput.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23/build/js/intlTelInputWithUtils.js"></script>
   <style>
     :root {
       --grad: linear-gradient(135deg, #7E6FAE, #4EA8A6);
@@ -104,6 +106,12 @@
     .m-skip:hover { color:var(--text); }
     .toast-el { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--text); color:#fff; padding:12px 24px; border-radius:12px; font-size:14px; z-index:2000; pointer-events:none; white-space:nowrap; animation:ti .35s var(--spring),to .3s var(--ease) 2.7s forwards; }
     .field-err { font-size:12px; color:#e05252; margin-top:5px; animation:fi .25s var(--ease); }
+    .iti { width:100%; }
+    .iti__tel-input { width:100%; padding:11px 14px 11px 52px; border-radius:10px; border:1px solid var(--bord); font-size:14px; outline:none; background:var(--bg); font-family:'Inter',sans-serif; min-height:44px; box-sizing:border-box; transition:border-color .2s,box-shadow .2s; color:var(--text); }
+    .iti__tel-input:focus { border-color:var(--teal); box-shadow:0 0 0 3px rgba(78,168,166,.12); }
+    .iti__flag-container { height:100%; }
+    .iti__selected-flag { border-radius:10px 0 0 10px; background:transparent; padding:0 8px 0 10px; }
+    .iti__country-list { border:1px solid var(--bord); border-radius:12px; box-shadow:0 8px 24px rgba(26,26,46,.1); font-family:'Inter',sans-serif; font-size:13px; max-height:220px; }
 
     @keyframes fi { from{opacity:0} to{opacity:1} }
     @keyframes su { from{opacity:0;transform:translateY(20px) scale(.94)} to{opacity:1;transform:none} }
@@ -165,7 +173,7 @@
       <div class="fg"><label class="fl" for="fn">First Name *</label><input class="fi" type="text" id="fn" name="first_name" placeholder="First Name" required autocomplete="given-name"></div>
       <div class="fg"><label class="fl" for="ln">Last Name *</label><input class="fi" type="text" id="ln" name="last_name" placeholder="Last Name" required autocomplete="family-name"></div>
       <div class="fg"><label class="fl" for="em">Email *</label><input class="fi" type="email" id="em" name="email" placeholder="Email" required autocomplete="email"></div>
-      <div class="fg"><label class="fl" for="ph">Phone (optional)</label><input class="fi" type="tel" id="ph" name="phone" placeholder="+1 Phone number" autocomplete="tel"></div>
+      <div class="fg"><label class="fl" for="ph">Phone <span class="fl-opt">(optional)</span></label><input type="tel" id="ph" name="phone" placeholder="Phone number" autocomplete="tel"></div>
       <input type="text" name="website" autocomplete="off" tabindex="-1" aria-hidden="true" style="display:none">
       <p class="m-legal">By clicking 'Sign up now', you consent to receive marketing communications from Demetra via email. Consent is not a condition of purchase. You can unsubscribe at any time.</p>
       <button class="btn-full-dark" id="s1-btn">Sign up now</button>
@@ -258,6 +266,14 @@
 </div>
 
 <script>
+// ── PHONE INPUT
+var iti = window.intlTelInput(document.getElementById('ph'), {
+  initialCountry: 'auto',
+  geoIpLookup: function(cb){ fetch('https://ipapi.co/json').then(function(r){ return r.json(); }).then(function(d){ cb(d.country_code); }).catch(function(){ cb('us'); }); },
+  separateDialCode: true,
+  strictMode: true,
+});
+
 // ── SUPABASE CLIENT
 var sb = supabase.createClient(
   'https://zzlkuzslpwozbfdazdqi.supabase.co',
@@ -287,12 +303,13 @@ var sb = supabase.createClient(
     var firstName=document.getElementById('fn').value.trim();
     var lastName =document.getElementById('ln').value.trim();
     var email    =document.getElementById('em').value.trim();
-    var phone    =document.getElementById('ph').value.trim();
+    var phoneVal = document.getElementById('ph').value.trim();
 
     if(!firstName){ showFieldError('fn','First name is required'); return; }
     if(!lastName) { showFieldError('ln','Last name is required');  return; }
     if(!email)    { showFieldError('em','Email is required');       return; }
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ showFieldError('em','Please enter a valid email address'); return; }
+    if(phoneVal && !iti.isValidNumber()){ showFieldError('ph','Please enter a valid phone number'); return; }
 
     btn.disabled=true; btn.textContent='Saving…';
 
@@ -300,7 +317,7 @@ var sb = supabase.createClient(
       first_name: firstName,
       last_name:  lastName,
       email:      email,
-      phone:      phone || null,
+      phone:      phoneVal ? iti.getNumber() : null,
     }).select('id').single();
 
     btn.disabled=false; btn.textContent='Sign up now';

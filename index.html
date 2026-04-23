@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Demetra | Like Having a Doctor in the Family</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%237E6FAE'/><stop offset='100%25' stop-color='%234EA8A6'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='url(%23g)'/><text x='16' y='23' text-anchor='middle' font-family='system-ui' font-weight='700' font-size='19' fill='white'>D</text></svg>">
   <meta name="description" content="Demetra unifies your health data and uses AI to guide proactive care for you and your family. Free. Join the waitlist.">
   <meta property="og:title" content="Demetra | Like Having a Doctor in the Family">
   <meta property="og:description" content="The proactive health platform for families. Know what to do next. Join the waitlist.">
@@ -28,10 +29,6 @@
     body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 
     /* ══ NAV ══ */
-    .nav { position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:100; width:min(92vw,560px); padding:10px 10px 10px 20px; border-radius:999px; display:flex; align-items:center; justify-content:space-between; background:linear-gradient(135deg,rgba(255,255,255,.3),rgba(255,255,255,.15)); backdrop-filter:blur(32px) saturate(1.7); -webkit-backdrop-filter:blur(32px) saturate(1.7); border:1px solid rgba(255,255,255,.35); box-shadow:0 2px 16px rgba(26,26,46,.05),inset 0 1px 0 rgba(255,255,255,.4); animation:nav-drop .8s var(--ease) .1s both; }
-    @keyframes nav-drop { from{opacity:0;transform:translateX(-50%) translateY(-20px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
-    .nav-logo { font-family:'Outfit',sans-serif; font-weight:700; font-size:19px; color:var(--text); text-decoration:none; display:flex; align-items:center; gap:7px; }
-    .d-icon { width:26px; height:26px; border-radius:7px; background:var(--grad); display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:700; flex-shrink:0; }
 
     /* ══ BUTTONS ══ */
     .btn { border:none; cursor:pointer; font-family:'Inter',sans-serif; font-weight:600; display:inline-flex; align-items:center; justify-content:center; touch-action:manipulation; position:relative; overflow:hidden; }
@@ -118,19 +115,13 @@
     footer { padding:20px; text-align:center; }
     .foot-copy { color:var(--t2); font-size:11px; }
 
-    @media (max-width:480px) { .nav { padding:8px 8px 8px 16px; } .btn-pill { padding:7px 14px; font-size:12px; } }
+    @media (max-width:480px) { .btn-pill { padding:7px 14px; font-size:12px; } }
     @media (prefers-reduced-motion:reduce) { *, *::before, *::after { animation-duration:.01ms !important; transition-duration:.01ms !important; } }
   </style>
 </head>
 <body>
 
 <!-- NAV -->
-<nav class="nav" role="navigation" aria-label="Main navigation">
-  <a href="/" class="nav-logo" aria-label="Demetra home">
-    <span class="d-icon" aria-hidden="true">D</span>demetra
-  </a>
-  <button class="btn btn-grad btn-pill" id="nav-cta" aria-haspopup="dialog">Join the Waitlist</button>
-</nav>
 
 <main id="main">
 
@@ -284,7 +275,7 @@ var sb = supabase.createClient(
   function showFieldError(fieldId,msg){ var field=document.getElementById(fieldId); var ex=field.parentNode.querySelector('.field-err'); if(ex) ex.remove(); var err=document.createElement('p'); err.className='field-err'; err.setAttribute('role','alert'); err.textContent=msg; field.parentNode.appendChild(err); setTimeout(function(){ err.remove(); },4500); }
   function clearErrors(){ document.querySelectorAll('.field-err').forEach(function(el){ el.remove(); }); }
 
-  ['nav-cta','hero-cta'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('click',function(){ open(el); }); });
+  document.getElementById('hero-cta').addEventListener('click',function(){ open(this); });
   document.getElementById('m-close').addEventListener('click',close);
   ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
   document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&!ov.classList.contains('hide')) close(); });
